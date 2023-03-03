@@ -1,21 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-
+﻿using System.Data;
 namespace DispatcherClient
 {
     public partial class Order : Form
     {
+        public enum OrderType { 
+            NewOrder,
+            DuplicateOrder,
+            СhangeOrder
+        }
         MySQL mySQL;
         List<Product> productList = new List<Product>();
-        public Order(MySQL mySQL)
+        string idOrder = "";
+        OrderType orderType;
+        public Order(MySQL mySQL, OrderType orderType)
         {
+            this.orderType = orderType;
             this.mySQL = mySQL;
             InitializeComponent();
             basketGrid.Columns.Add("name", "Продукт");
@@ -30,7 +29,51 @@ namespace DispatcherClient
                 }
             }
         }
+        public Order(MySQL mySQL, string idOrder, OrderType orderType)
+        {
+            this.orderType = orderType;
+            this.idOrder = idOrder;
+            this.mySQL = mySQL;
+            InitializeComponent(); 
+            using (DataTable dataTable = mySQL.GetDataTableSQL("SELECT * FROM products"))
+            {
+                foreach (DataRow dr in dataTable.Rows)
+                {
+                    productList.Add(new Product(dr));
+                    products.Items.Add(dr["name"].ToString());
+                }
+            }
+            using (DataTable dataTable = mySQL.GetDataTableSQL("SELECT * FROM orders, users WHERE orders.id = " + idOrder + " AND orders.id_user = users.id")) 
+            {
+                if(dataTable.Rows.Count == 1)
+                {
+                    idOrder = dataTable.Rows[0]["id"].ToString();
+                    fio.Text = dataTable.Rows[0]["name"].ToString();
+                    addr.Text = dataTable.Rows[0]["address"].ToString();
+                    tell.Text = dataTable.Rows[0]["number"].ToString();
+                    dateTimePicker1.Value = DateTime.Parse(dataTable.Rows[0]["delivery_time"].ToString());
+                }
+            }
+            basketGrid.Columns.Add("name", "Продукт");
+            basketGrid.Columns.Add("count", "Количество");
+            basketGrid.Columns.Add("price", "Цена");
+            using (DataTable dataProducts = mySQL.GetDataTableSQL("SELECT products.name, order_items.count, products.price FROM order_items, products WHERE id_order = " + idOrder +
+                " AND order_items.id_product = products.id"))
+            {
+                if(dataProducts.Rows.Count > 0)
+                {
+                    foreach (DataRow row in dataProducts.Rows)
+                    {
+                        int newRow = basketGrid.Rows.Add();
+                        basketGrid.Rows[newRow].Cells[0].Value = row["name"].ToString();
+                        basketGrid.Rows[newRow].Cells[1].Value = row["count"].ToString();
+                        basketGrid.Rows[newRow].Cells[2].Value = (int.Parse(row["count"].ToString()) * int.Parse(row["price"].ToString()));
+                    }
+                }
+            }
+           
 
+        }
         private void button2_Click(object sender, EventArgs e)
         {
             this.Close();
@@ -94,24 +137,59 @@ namespace DispatcherClient
                 MessageBox.Show("Добавите товар");
                 return;
             }
-            string idUser = GetUserID(fio.Text,tell.Text); 
-            int summ = 0;
-            foreach (DataGridViewRow row in basketGrid.Rows)
-                summ += (int)row.Cells["price"].Value;
-            string numberOrder = mySQL.InsertSQL("INSERT orders (id_user, order_time, delivery_time, address, price, status) "+
-                "VALUES('" + idUser + "','" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "', '"+dateTimePicker1.Value.ToString("yyyy-MM-dd HH:mm:ss") + "' , '"+addr.Text+"',"+ summ.ToString()+ ",'создано')").ToString();
-            foreach(DataGridViewRow row in basketGrid.Rows)
+            if (orderType == OrderType.NewOrder)
             {
-                int prodID = GetProductID(row.Cells["name"].Value.ToString());
-                if (prodID == -1)
-                    continue;
-                mySQL.SendSQL("INSERT order_items (id_order, id_product, count) VALUES(" + numberOrder+","+prodID.ToString()+","+row.Cells["count"].Value.ToString()+")");
-
+                string userID = GetUserID(fio.Text, tell.Text);
+                int summ = 0;
+                foreach (DataGridViewRow row in basketGrid.Rows)
+                    summ += (int)row.Cells["price"].Value;
+                string numberOrder = mySQL.InsertSQL("INSERT orders (id_user, order_time, delivery_time, address, price, status) " +
+                    "VALUES('" + userID + "','" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "', '" + dateTimePicker1.Value.ToString("yyyy-MM-dd HH:mm:ss") + "' , '" + addr.Text + "'," + summ.ToString() + ",'Создано')").ToString();
+                foreach (DataGridViewRow row in basketGrid.Rows)
+                {
+                    int prodID = GetProductID(row.Cells["name"].Value.ToString());
+                    if (prodID == -1)
+                        continue;
+                    mySQL.SendSQL("INSERT order_items (id_order, id_product, count) VALUES(" + numberOrder + "," + prodID.ToString() + "," + row.Cells["count"].Value.ToString() + ")");
+                }
+                MessageBox.Show("Заявка добавлена в систему");
             }
-            MessageBox.Show("Заявка добавлена в систему");
+            else if(orderType == OrderType.СhangeOrder)
+            {
+                int summ = 0;
+                foreach (DataGridViewRow row in basketGrid.Rows)
+                    summ += (int)row.Cells["price"].Value;
+                mySQL.SendSQL("UPDATE orders SET delivery_time = '" + dateTimePicker1.Value.ToString("yyyy-MM-dd HH:mm:ss") + "', " +
+                    "address = '" + addr.Text + "', price = '" + summ.ToString() + "' WHERE id = " + idOrder);
+                mySQL.SendSQL("DELETE FROM order_items WHERE id_order = " + idOrder);
+                foreach (DataGridViewRow row in basketGrid.Rows)
+                {
+                    int prodID = GetProductID(row.Cells["name"].Value.ToString());
+                    if (prodID == -1)
+                        continue;
+                    mySQL.SendSQL("INSERT order_items (id_order, id_product, count) VALUES(" + idOrder + "," + prodID.ToString() + "," + row.Cells["count"].Value.ToString() + ")");
+
+                }
+            }
+            else if (orderType == OrderType.DuplicateOrder)
+            {
+                string userID = GetUserID(fio.Text, tell.Text);
+                int summ = 0;
+                foreach (DataGridViewRow row in basketGrid.Rows)
+                    summ += (int)row.Cells["price"].Value;
+                string numberOrder = mySQL.InsertSQL("INSERT orders (id_user, order_time, delivery_time, address, price, status) " +
+                    "VALUES('" + userID + "','" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "', '" + dateTimePicker1.Value.ToString("yyyy-MM-dd HH:mm:ss") + "' , '" + addr.Text + "'," + summ.ToString() + ",'Создано')").ToString();
+                foreach (DataGridViewRow row in basketGrid.Rows)
+                {
+                    int prodID = GetProductID(row.Cells["name"].Value.ToString());
+                    if (prodID == -1)
+                        continue;
+                    mySQL.SendSQL("INSERT order_items (id_order, id_product, count) VALUES(" + numberOrder + "," + prodID.ToString() + "," + row.Cells["count"].Value.ToString() + ")");
+                }
+                MessageBox.Show("Заявка добавлена в систему");
+            }
             this.Close();
         }
-
         private void products_SelectedIndexChanged(object sender, EventArgs e)
         {
             foreach (Product pr in productList)
