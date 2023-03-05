@@ -18,7 +18,7 @@ namespace DispatcherClient
             this.mySQL = mySQL;
             InitializeComponent();
         }
-
+        public TypeUser User { get; set; }
         private void button2_Click(object sender, EventArgs e)
         {
             if (textBox1.Text.Length > 0)
@@ -33,6 +33,13 @@ namespace DispatcherClient
                             {
                                 if(user.Rows[0]["type"].ToString() == TypeUser.dispatcher.ToString())
                                 {
+                                    User = TypeUser.dispatcher;                                    
+                                    this.DialogResult = DialogResult.OK;
+                                    this.Close();
+                                }
+                                else if (user.Rows[0]["type"].ToString() == TypeUser.admin.ToString())
+                                {
+                                    User = TypeUser.admin;
                                     this.DialogResult = DialogResult.OK;
                                     this.Close();
                                 }

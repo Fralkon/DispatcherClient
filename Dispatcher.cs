@@ -8,19 +8,23 @@ namespace DispatcherClient
         string filterText = "";
         public Dispatcher()
         {
-            //while (true)
-            //{
-            //    Auth auth = new Auth(mySQL);
-            //    auth.ShowDialog();
-            //    if (auth.DialogResult == DialogResult.OK)
-            //        break;
-            //    else if (auth.DialogResult == DialogResult.Cancel)
-            //    {
-            //        this.Close();
-            //        break;
-            //    }
-            //}
+            Auth auth = new Auth(mySQL);
+            while (true)
+            {
+                auth.ShowDialog();
+                if (auth.DialogResult == DialogResult.OK)
+                    break;
+                else if (auth.DialogResult == DialogResult.Cancel)
+                {
+                    this.Close();
+                    break;
+                }
+            }
             InitializeComponent();
+            if (auth.User == TypeUser.admin)
+                ‡‰ÏËÌÍ‡ToolStripMenuItem.Visible = true;
+            else
+                ‡‰ÏËÌÍ‡ToolStripMenuItem.Visible = false;
             dataGridView1.ContextMenuStrip = contextMenuStrip1;
             UpDateTable();
         }
@@ -28,12 +32,15 @@ namespace DispatcherClient
         {
             string SQLData = "SELECT orders.id, users.name, users.number, orders.address, orders.delivery_time, " +
                 "orders.price, orders.order_time, orders.status FROM orders, users WHERE orders.id_user = users.id";
-            string filterStatus = " AND (status IN(";
-            
+            string filterStatus = "";
+            foreach (ToolStripMenuItem item in ÒÚ‡ÚÛÒToolStripMenuItem1.DropDownItems) {
+                if (item.Checked)
+                    filterStatus += "'"+ item.Text + "',";
+            }
             if (ÒÓÁ‰‡ÌÓToolStripMenuItem1.Checked)
                 filterStatus += "'—ÓÁ‰‡ÌÓ',";
-            if (filterStatus != " AND (status IN(")
-                SQLData += filterStatus.Substring(0, filterStatus.Length - 1) + "))";
+            if (filterStatus != "")
+                SQLData += " AND (status IN(" + filterStatus.Substring(0, filterStatus.Length - 1) + "))";
             if(filterText != "")
                 SQLData += " AND (orders.id LIKE '%"+filterText+"%' OR users.name LIKE '%" + filterText + "%' OR users.number LIKE '%" + filterText+ "%' OR orders.address LIKE '%" + filterText+"%')";
             //MessageBox.Show(SQLData);
@@ -104,8 +111,19 @@ namespace DispatcherClient
             item.Checked = item.Checked == true ? false : true;
             UpDateTable();
         }
+
+        private void ÚÓ‚‡˚ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Products productsForm = new Products();
+            productsForm.ShowDialog();
+        }
+
+        private void ‚˚ıÓ‰ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
     }
-    enum TypeUser
+    public enum TypeUser
     {
         admin,
         dispatcher,
