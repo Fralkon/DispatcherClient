@@ -122,11 +122,16 @@ namespace DispatcherClient
         {
             this.Close();
         }
+
+        private void ïîëüçîâàòåëèToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Admins adminsForm = new Admins();
+            adminsForm.ShowDialog();
+        }
     }
     public enum TypeUser
     {
         admin,
-        dispatcher,
-        user
+        dispatcher
     }
 }
